@@ -1,126 +1,108 @@
 from django.db import models
-from django.db.models import TextChoices, CharField, ForeignKey, CASCADE, Model
+from django.utils import timezone
+from django.contrib.auth.models import User
 
-class Base(Model):
+
+class Base(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         abstract = True
 
-class Lead(Base):
-    full_name = models.CharField(max_length=255)
-    phone = models.CharField(max_length=20, unique=True)
-    email = models.EmailField(blank=True, null=True)
-    source = models.CharField(max_length=255, blank=True, null=True)
-
-    operator = models.ForeignKey(
-        "apps.Operator",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="leads"
-    )
-
-    class StatusChoices(TextChoices):
-        NEW = 'New' , 'new'
-        INFO_GIVEN = 'Info_given' , 'info_given'
-        MEETING_SCHEDULED = 'Meeting_scheduled' , 'meeting_scheduled'
-        MEETING_DONE = 'Meeting_done' , 'meeting_done'
-        NOT_REACHED = 'Not_reached' , 'not_reached'
-        SOLD = 'Sold' , 'sold'
-        NOT_SOLD = 'Not_sold', 'not_sold'
-        NO_SHOW = 'No_show', 'no_show'
-
-
-    status = models.CharField(max_length=20, choices=StatusChoices, default='new')
-
-    def __str__(self):
-        return f"{self.full_name} ({self.phone})"
-
-class Operator(Base):
-    class StatusType(TextChoices):
-        INTERN = 'Intern', 'intern',
-        WORKER = 'Worker', 'worker'
-
-    class StatusGender(TextChoices):
-        MALE = 'Male', 'male',
-        FEMALE = 'Female', 'female'
-
-    full_name = models.CharField(max_length=100)
-    status = CharField(choices=StatusType)
-    phone_number = models.CharField(max_length=20)
-    penalty = models.IntegerField(blank=True, null=True)
-    gender = CharField(choices=StatusGender)
-    branch_id = ForeignKey("apps.Branch", CASCADE, related_name='operators')
-    task_id = ForeignKey("apps.Task", CASCADE, related_name='operators', blank=True, null=True)
-
-    def __str__(self):
-        return self.full_name
-
-class Task(Base):
-    operator = models.ForeignKey(
-        "apps.Operator",
-        on_delete=models.CASCADE,
-        related_name="tasks"
-    )
-    lead = models.ForeignKey(
-        Lead,
-        on_delete=models.CASCADE,
-        related_name="tasks"
-    )
-    description = models.TextField()
-    due_date = models.DateTimeField()
-    completed = models.BooleanField(default=False)
-
-
-
-    class Meta:
-        ordering = ['due_date']
-
-    def __str__(self):
-        return f"Task for {self.operator.full_name} -> {self.lead.full_name}"
-
 
 class Branch(Base):
-    name = CharField(max_length=255)
-    location = CharField(max_length=255)
+    name = models.CharField(max_length=255)
+    location = models.CharField(max_length=255)
 
     def __str__(self):
         return self.name
 
 
+class Operator(Base):
+    class StatusType(models.TextChoices):
+        INTERN = 'Intern', 'Intern'
+        WORKER = 'Worker', 'Worker'
 
+    class StatusGender(models.TextChoices):
+        MALE = 'Male', 'Male'
+        FEMALE = 'Female', 'Female'
 
-class Call(Base):
-    DIRECTION_CHOICES = (
-        ('outbound', 'Outbound'),  # Sizdan talaba tomon
-        ('inbound', 'Inbound'),    # Talabadan sizga
-    )
-
-
-    lead = models.ForeignKey(Lead, on_delete=models.SET_NULL, null=True, blank=True)
-    operator = models.ForeignKey(Operator, on_delete=models.SET_NULL, null=True, blank=True)
-    direction = models.CharField(max_length=10, choices=DIRECTION_CHOICES, default='outbound')
-    provider_call_sid = models.CharField(max_length=255, blank=True, null=True)  # Twilio yoki boshqa xizmat ID’si
-    started_at = models.DateTimeField(null=True, blank=True)
-    ended_at = models.DateTimeField(null=True, blank=True)
-    duration_seconds = models.IntegerField(null=True, blank=True)
-    recording_url = models.URLField(null=True, blank=True)
-    notes = models.TextField(null=True, blank=True)
-
+    full_name = models.CharField(max_length=100)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True)
+    status = models.CharField(max_length=20, choices=StatusType.choices)
+    phone_number = models.CharField(max_length=20)
+    photo = models.ImageField(upload_to='operator_photos/', blank=True, null=True)
+    salary = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    penalty = models.IntegerField(default=0)
+    gender = models.CharField(max_length=10, choices=StatusGender.choices)
+    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='operators')
 
     def __str__(self):
-        return f"{self.lead}"
+        return self.full_name
 
-    @property
-    def duration_display(self):
-        """Soniya emas, minut/sekund ko‘rinishida chiqarish uchun"""
-        if not self.duration_seconds:
-            return "–"
-        minutes, seconds = divmod(self.duration_seconds, 60)
-        return f"{minutes} min {seconds} sec"
+    def add_penalty(self, points=1):
+        self.penalty += points
+        self.save(update_fields=['penalty'])
 
+class Lead(Base):
+    class Status(models.TextChoices):
+        NEED_CONTACT = "need_contact", "Need Contact"
+        INFO_PROVIDED = "info_provided", "Information Provided"
+        MEETING_SCHEDULED = "meeting_scheduled", "Meeting Scheduled"
+        MEETING_CANCELLED = "meeting_cancelled", "Meeting Cancelled"
+        COULD_NOT_CONTACT = "could_not_contact", "Could Not Contact"
+        SOLD = "sold", "Sold"
+        NOT_SOLD = "not_sold", "Not Sold"
+        DID_NOT_SHOW_UP = "did_not_show_up", "Did Not Show Up"
+
+    full_name = models.CharField(max_length=150)
+    phone = models.CharField(max_length=20, unique=True)
+    status = models.CharField(max_length=50, choices=Status.choices, default='new')
+    operator = models.ForeignKey(Operator, on_delete=models.SET_NULL, null=True, blank=True, related_name="leads")
+    source = models.CharField(max_length=100, blank=True, null=True)
+    demo_date = models.DateTimeField(blank=True, null=True)
+    last_contact_date = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Lead"
+        verbose_name_plural = "Leadlar"
+
+    def __str__(self):
+        return f"{self.full_name} ({self.get_status_display()})"
+
+class Task(Base):
+    operator = models.ForeignKey(Operator, on_delete=models.CASCADE, related_name="tasks")
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name="tasks")
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    deadline = models.DateTimeField()
+    is_completed = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(blank=True, null=True)
+    penalty_points = models.IntegerField(default=0)
+
+    def mark_completed(self):
+        self.is_completed = True
+        self.completed_at = timezone.now()
+        self.save(update_fields=['is_completed', 'completed_at'])
+
+    def __str__(self):
+        return f"{self.title} ({'Bajarilgan' if self.is_completed else 'Bajarilmagan'})"
+
+class Penalty(models.Model):
+    operator = models.ForeignKey(Operator, on_delete=models.CASCADE, related_name="penalties")
+    task = models.ForeignKey(Task, on_delete=models.SET_NULL, null=True, blank=True)
+    reason = models.CharField(max_length=255)
+    points = models.IntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Jarima"
+        verbose_name_plural = "Jarimalar"
+
+    def apply_penalty(self):
+        self.operator.add_penalty(self.points)
 
 class SMS(Base):
     lead = models.ForeignKey(
@@ -139,51 +121,17 @@ class SMS(Base):
     delivered = models.BooleanField(default=False)
     error_message = models.TextField(blank=True, null=True)
 
-    class Meta:
-        ordering = ['-sent_at']
+    def __str__(self):
+        return f"SMS to {self.lead.phone} by {self.operator.user.username if self.operator.user else 'unknown'}"
 
-    def str(self):
-        return f"SMS to {self.lead.phone} by {self.operator.username}"
 
-class Penalty(Base):
-    operator = models.ForeignKey('apps.Operator', on_delete=models.CASCADE, related_name="penalties")
-    lead = models.ForeignKey('apps.Lead', on_delete=models.CASCADE, related_name="penalties")
-    task = models.ForeignKey('apps.Task', on_delete=models.SET_NULL, null=True, blank=True)
-    reason = models.CharField(max_length=255)
-    points = models.IntegerField(default=1)
+class Contract(Base):
+    operator = models.ForeignKey(Operator, on_delete=models.SET_NULL, null=True, blank=True, related_name="contracts")
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name="contracts")
+    course_name = models.CharField(max_length=255)
+    start_date = models.DateTimeField()
+    end_date = models.DateTimeField()
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2)
 
     def __str__(self):
-        return f"{self.operator} -> {self.lead}"
-
-
-
-
-
-
-
-
-
-
-#
-# class Contract(Base):
-#     student = models.ForeignKey(
-#         Student,
-#         on_delete=models.CASCADE,
-#         related_name="contracts"
-#     )
-#     course_name = models.CharField(max_length=255)
-#     start_date = models.DateTimeField()
-#     end_date = models.DateTimeField()
-#     amount_paid = models.DecimalField(max_digits=10, decimal_places=2)
-#     operator = models.ForeignKey(
-#         User,
-#         on_delete=models.SET_NULL,
-#         null=True,
-#         blank=True,
-#         limit_choices_to={'role': 'operator'},
-#         related_name="contracts"
-#     )
-#     created_at = models.DateTimeField(auto_now_add=True)
-#
-#     def str(self):
-#         return f"Contract {self.student.name} - {self.course_name}"
+        return self.course_name
