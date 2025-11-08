@@ -1,3 +1,11 @@
+<<<<<<< HEAD
 # Default ignored files
 /shelf/
 /workspace.xml
+=======
+# Default ignored files
+/shelf/
+/workspace.xml
+# Editor-based HTTP Client requests
+/httpRequests/
+>>>>>>> 70dd5bc (first commit)
