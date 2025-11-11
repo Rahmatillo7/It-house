@@ -2,6 +2,8 @@ from django.db import models
 from django.utils import timezone
 from django.contrib.auth.models import User
 
+from Auth.models import CustomUser
+
 
 class Base(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
@@ -29,7 +31,7 @@ class Operator(Base):
         FEMALE = 'Female', 'Female'
 
     full_name = models.CharField(max_length=100)
-    user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True)
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, null=True, blank=True)
     status = models.CharField(max_length=20, choices=StatusType.choices)
     phone_number = models.CharField(max_length=20)
     photo = models.ImageField(upload_to='operator_photos/', blank=True, null=True)
@@ -81,14 +83,28 @@ class Task(Base):
     is_completed = models.BooleanField(default=False)
     completed_at = models.DateTimeField(blank=True, null=True)
     penalty_points = models.IntegerField(default=0)
+    is_notified_10min = models.BooleanField(default=False)
+    is_notified_5min = models.BooleanField(default=False)
 
     def mark_completed(self):
         self.is_completed = True
         self.completed_at = timezone.now()
-        self.save(update_fields=['is_completed', 'completed_at'])
+        self.is_notified_10min = False
+        self.is_notified_5min = False
+        self.save(update_fields=['is_completed', 'completed_at', 'is_notified_10min', 'is_notified_5min'])
 
     def __str__(self):
         return f"{self.title} ({'Bajarilgan' if self.is_completed else 'Bajarilmagan'})"
+
+class Notification(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='notifications')
+    message = models.TextField()
+    data = models.JSONField(null=True, blank=True)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Notif to {self.user.username}: {self.message[:50]}"
 
 class Penalty(models.Model):
     operator = models.ForeignKey(Operator, on_delete=models.CASCADE, related_name="penalties")

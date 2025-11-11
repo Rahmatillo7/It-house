@@ -41,6 +41,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'apps',
+    'Auth',
+    'channels',
     'rest_framework',
     'drf_yasg',
 
@@ -50,7 +52,18 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google',
     'allauth.socialaccount.providers.facebook',
     'rest_framework.authtoken',
+    'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',
+    ],
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -81,7 +94,31 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+ASGI_APPLICATION = 'config.asgi.application'
 
+# Channels layer (Redis)
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    },
+}
+
+# Celery (oddiy minimal sozlama)
+CELERY_BROKER_URL = 'redis://127.0.0.1:6379/1'
+CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/2'
+
+# Celery Beat — har daqiqada ishlash uchun
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    'check-deadlines-every-minute': {
+        'task': 'apps.tasks.check_task_deadlines',
+        'schedule': 60.0,
+    },
+}
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
@@ -176,3 +213,9 @@ SOCIALACCOUNT_PROVIDERS = {
 
 SOCIAL_AUTH_FACEBOOK_KEY = '<your-app-id>'
 SOCIAL_AUTH_FACEBOOK_SECRET = '<your-app-secret>'
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'Auth.backends.UsernameOrEmailOrPhoneBackend',
+]
+AUTH_USER_MODEL = 'Auth.CustomUser'

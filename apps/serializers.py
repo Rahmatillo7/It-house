@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Lead, Task
+from .models import Lead, Task, Notification
 
 class LeadSerializer(serializers.ModelSerializer):
     class Meta:
@@ -30,4 +30,10 @@ class TaskCreateSerializer(serializers.ModelSerializer):
         model = Task
         fields = ['id', 'operator', 'lead', 'title', 'description', 'deadline']
         read_only_fields = ['id', 'operator']
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ['id', 'message', 'data', 'is_read', 'created_at']
 

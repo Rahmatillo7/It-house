@@ -1,5 +1,5 @@
 from django.contrib import admin
-from apps.models import Branch, Operator, Lead, Task, Penalty, SMS, Contract
+from apps.models import Branch, Operator, Lead, Task, Penalty, SMS, Contract, Notification
 
 
 @admin.register(Branch)
@@ -44,6 +44,8 @@ class TaskAdmin(admin.ModelAdmin):
     list_filter = ('is_completed', 'deadline')
     search_fields = ('title', 'operator__full_name', 'lead__full_name')
     readonly_fields = ('created_at', 'updated_at')
+
+admin.site.register(Notification)
 
 
 @admin.register(Penalty)
