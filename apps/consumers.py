@@ -24,3 +24,5 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             "data": event.get("data"),
             "created_at": event.get("created_at"),
         }))
+
+
